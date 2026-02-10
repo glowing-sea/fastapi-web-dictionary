@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>History</h1>
+
+  {% if dicts|length == 0 %}
+    <div class="card">
+      <p><strong>No dictionaries installed.</strong></p>
+      <p class="hint">Ask an admin to upload an MDX ZIP in Admin: Dictionaries.</p>
+    </div>
+  {% else %}
+    <div class="row space-between">
+      <form method="get" action="/history" class="row">
+        <label class="row">Dictionary:
+          <select name="dict_id" onchange="this.form.submit()">
+            {% for d in dicts %}
+              <option value="{{ d.id }}" {% if d.id == selected_dict_id %}selected{% endif %}>{{ d.name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+      </form>
+      <form method="post" action="/history/clear">
+        <button class="danger" type="submit">Clear all</button>
+      </form>
+    </div>
+
+    <div class="split">
+      <aside class="panel">
+        <h2>Recent searches</h2>
+        {% if items|length == 0 %}
+          <p class="hint">No history yet. Search something in Dictionary.</p>
+        {% else %}
+          <ul class="list">
+            {% for it in items %}
+              <li class="{% if selected_item and selected_item.id == it.id %}active{% endif %}">
+                <a href="/history?dict_id={{ selected_dict_id }}&item_id={{ it.id }}">{{ it.headword }}</a>
+                <form method="post" action="/history/{{ it.id }}/delete" class="inline">
+                  <input type="hidden" name="dict_id" value="{{ selected_dict_id }}" />
+                  <button class="linklike-dark" type="submit">✕</button>
+                </form>
+                <div class="hint small">{{ it.created_at }}</div>
+              </li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      </aside>
+
+      <section class="panel">
+        {% if selected_item %}
+          <h2>{{ selected_item.headword }}</h2>
+          <div class="card">
+            <h3>Definition</h3>
+            {% if result %}
+              <div class="definition">{{ result.html | safe }}</div>
+            {% else %}
+              <p class="hint">No definition available.</p>
+            {% endif %}
+          </div>
+        {% else %}
+          <p class="hint">Select an item on the left.</p>
+        {% endif %}
+      </section>
+    </div>
+  {% endif %}
+{% endblock %}

@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>Register</h1>
+  <form method="post" action="/register" class="card">
+    <label>Username <input name="username" required minlength="3" /></label>
+    <label>Password <input type="password" name="password" required minlength="6" /></label>
+    <button type="submit">Create account</button>
+  </form>
+  <p>Already have an account? <a href="/login">Login</a>.</p>
+  <p class="hint">All new accounts are normal users. To become admin, set <code>users.is_admin=1</code> in SQLite.</p>
+{% endblock %}

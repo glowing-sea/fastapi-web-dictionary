@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>Welcome{% if user %}, {{ user.display_name or user.username }}{% endif %} 👋</h1>
+
+  {% if user %}
+    <p>You are logged in as <strong>{{ user.username }}</strong>.</p>
+    <div class="grid2">
+      <section class="card"><h2>Dictionary</h2><p>Search installed MDX dictionaries.</p><a class="button" href="/dictionary">Open dictionary</a></section>
+      <section class="card"><h2>Vocabulary</h2><p>Your favourite words with notes.</p><a class="button" href="/vocab">Open vocabulary</a></section>
+      <section class="card"><h2>History</h2><p>Everything you searched.</p><a class="button" href="/history">Open history</a></section>
+      <section class="card"><h2>Idea Board</h2><p>Old demo feature, still available.</p><a class="button" href="/ideas">Open ideas</a></section>
+    </div>
+  {% else %}
+    <p>This app demonstrates a clean project structure with layers.</p>
+    <p><a class="button" href="/register">Create an account</a> or <a class="button" href="/login">Log in</a>.</p>
+  {% endif %}
+{% endblock %}

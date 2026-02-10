@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ title or "FastAPI Dictionary App" }}</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="container row">
+      <div class="brand"><a href="/">WebDict</a></div>
+      <nav class="nav">
+        <a href="/">Home</a>
+        {% if user %}
+          <a href="/dictionary">Dictionary</a>
+          <a href="/vocab">Vocabulary</a>
+          <a href="/history">History</a>
+          <a href="/ideas">Ideas</a>
+          <a href="/me">Profile</a>
+          {% if user.is_admin %}
+            <a class="badge" href="/admin/dicts">Admin: Dictionaries</a>
+          {% endif %}
+          <form class="inline" method="post" action="/logout">
+            <button class="linklike" type="submit">Logout</button>
+          </form>
+        {% else %}
+          <a href="/login">Login</a>
+          <a href="/register">Register</a>
+        {% endif %}
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    {% if error %}<div class="alert">{{ error }}</div>{% endif %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="footer container"><small>Demo app • layered architecture • SQLite • MDX dictionaries</small></footer>
+</body>
+</html>

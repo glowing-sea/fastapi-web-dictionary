@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>Admin: Dictionary Manager</h1>
+
+  <section class="card">
+    <h2>Install / update a dictionary (ZIP)</h2>
+    <p class="hint">
+      ZIP should include exactly one <code>.mdx</code>.
+      It may include <code>.mdd</code>, <code>.css</code>, images, etc.
+    </p>
+
+    <form method="post" action="/admin/dicts/upload" enctype="multipart/form-data">
+      <label>Dictionary name <input name="name" required maxlength="80" placeholder="e.g. Oxford Learner's" /></label>
+      <label>ZIP file <input type="file" name="zip_file" accept=".zip" required /></label>
+      <button type="submit">Upload</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>Installed dictionaries</h2>
+    {% if dicts|length == 0 %}
+      <p class="hint">No dictionaries installed.</p>
+    {% else %}
+      <table class="table">
+        <thead><tr><th>Name</th><th>Folder</th><th>MDX</th><th>Installed</th><th></th></tr></thead>
+        <tbody>
+          {% for d in dicts %}
+            <tr>
+              <td>{{ d.name }}</td>
+              <td><code>{{ d.folder }}</code></td>
+              <td><code>{{ d.mdx_filename }}</code></td>
+              <td class="hint">{{ d.created_at }}</td>
+              <td>
+                <form method="post" action="/admin/dicts/{{ d.id }}/delete" onsubmit="return confirm('Delete dictionary {{ d.name }}?');">
+                  <button class="danger" type="submit">Delete</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+  </section>
+{% endblock %}

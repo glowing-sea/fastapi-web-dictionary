@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>My Ideas</h1>
+  <section class="card">
+    <h2>Create a new idea</h2>
+    <form method="post" action="/ideas">
+      <label>Title <input name="title" required maxlength="100" /></label>
+      <label>Details (optional) <textarea name="details" rows="4" maxlength="1000"></textarea></label>
+      <button type="submit">Add</button>
+    </form>
+  </section>
+  <h2>Saved ideas</h2>
+  {% if ideas|length == 0 %}
+    <p class="hint">No ideas yet. Add one above!</p>
+  {% else %}
+    <div class="ideas">
+      {% for idea in ideas %}
+        <article class="card">
+          <div class="row space-between">
+            <h3>{{ idea.title }}</h3>
+            <form method="post" action="/ideas/{{ idea.id }}/delete">
+              <button class="danger" type="submit">Delete</button>
+            </form>
+          </div>
+          {% if idea.details %}<p>{{ idea.details }}</p>{% endif %}
+          <p class="hint">Created at {{ idea.created_at }}</p>
+        </article>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endblock %}

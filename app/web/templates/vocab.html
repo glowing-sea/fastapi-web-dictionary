@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>Vocabulary (Favourites)</h1>
+
+  {% if dicts|length == 0 %}
+    <div class="card">
+      <p><strong>No dictionaries installed.</strong></p>
+      <p class="hint">Ask an admin to upload an MDX ZIP in Admin: Dictionaries.</p>
+    </div>
+  {% else %}
+    <div class="row">
+      <form method="get" action="/vocab" class="row">
+        <label class="row">Dictionary:
+          <select name="dict_id" onchange="this.form.submit()">
+            {% for d in dicts %}
+              <option value="{{ d.id }}" {% if d.id == selected_dict_id %}selected{% endif %}>{{ d.name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+      </form>
+    </div>
+
+    <div class="split">
+      <aside class="panel">
+        <h2>Words</h2>
+        {% if favourites|length == 0 %}
+          <p class="hint">No favourites yet. Search a word and click ⭐ Favourite.</p>
+        {% else %}
+          <ul class="list">
+            {% for f in favourites %}
+              <li class="{% if selected_fav and selected_fav.id == f.id %}active{% endif %}">
+                <a href="/vocab?dict_id={{ selected_dict_id }}&fav_id={{ f.id }}">{{ f.headword }}</a>
+              </li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      </aside>
+
+      <section class="panel">
+        {% if selected_fav %}
+          <div class="row space-between">
+            <h2>{{ selected_fav.headword }}</h2>
+            <form method="post" action="/vocab/{{ selected_fav.id }}/delete">
+              <input type="hidden" name="dict_id" value="{{ selected_dict_id }}" />
+              <button class="danger" type="submit">Remove</button>
+            </form>
+          </div>
+
+          <div class="card">
+            <h3>Notes</h3>
+            <form method="post" action="/vocab/{{ selected_fav.id }}/notes">
+              <input type="hidden" name="dict_id" value="{{ selected_dict_id }}" />
+              <textarea name="notes" rows="5" maxlength="2000">{{ selected_fav.notes }}</textarea>
+              <div class="row">
+                <button type="submit">Save notes</button>
+                <span class="hint">Notes are per favourite entry.</span>
+              </div>
+            </form>
+          </div>
+
+          <div class="card">
+            <h3>Definition</h3>
+            {% if result %}
+              <div class="definition">{{ result.html | safe }}</div>
+            {% else %}
+              <p class="hint">No definition available.</p>
+            {% endif %}
+          </div>
+        {% else %}
+          <p class="hint">Select a word on the left.</p>
+        {% endif %}
+      </section>
+    </div>
+  {% endif %}
+{% endblock %}

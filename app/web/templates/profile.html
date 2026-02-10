@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>Profile</h1>
+  <div class="grid2">
+    <section class="card">
+      <h2>Public info</h2>
+      <form method="post" action="/me/profile">
+        <label>Display name <input name="display_name" value="{{ user.display_name }}" maxlength="60" /></label>
+        <label>Bio <textarea name="bio" rows="5" maxlength="500">{{ user.bio }}</textarea></label>
+        <button type="submit">Save profile</button>
+      </form>
+    </section>
+    <section class="card">
+      <h2>Account</h2>
+      <p><strong>User ID:</strong> {{ user.id }}</p>
+      <p><strong>Username:</strong> {{ user.username }}</p>
+      <p><strong>Role:</strong> {% if user.is_admin %}Admin{% else %}Normal user{% endif %}</p>
+      <p><strong>Created:</strong> {{ user.created_at }}</p>
+      <hr/>
+      <h3>Change username</h3>
+      <form method="post" action="/me/username">
+        <label>New username <input name="new_username" required minlength="3" /></label>
+        <button type="submit">Change username</button>
+      </form>
+    </section>
+  </div>
+{% endblock %}

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>Dictionary</h1>
+
+  {% if dicts|length == 0 %}
+    <div class="card">
+      <p><strong>No dictionaries installed.</strong></p>
+      <p class="hint">Ask an admin to upload an MDX ZIP in Admin: Dictionaries.</p>
+    </div>
+  {% else %}
+    <section class="card">
+      <form method="post" action="/dictionary/search" class="row searchbar">
+        <div class="grow">
+          <input class="biginput" name="query" placeholder="Search a word..." value="{{ query }}" autofocus />
+        </div>
+        <div>
+          <select name="dict_id">
+            {% for d in dicts %}
+              <option value="{{ d.id }}" {% if d.id == selected_dict_id %}selected{% endif %}>{{ d.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div><button type="submit">Search</button></div>
+      </form>
+      <p class="hint">Tip: searches are case-sensitive in many MDX dictionaries.</p>
+    </section>
+
+    {% if result %}
+      <section class="card">
+        <div class="row space-between">
+          <h2>{{ result.headword }}</h2>
+          {% if result.found %}
+            <form method="post" action="/dictionary/favourite" class="row">
+              <input type="hidden" name="dict_id" value="{{ selected_dict_id }}" />
+              <input type="hidden" name="headword" value="{{ result.headword }}" />
+              <input name="notes" placeholder="Optional notes..." class="notesinput" />
+              <button type="submit">⭐ Favourite</button>
+            </form>
+          {% endif %}
+        </div>
+        <div class="definition">{{ result.html | safe }}</div>
+      </section>
+    {% endif %}
+  {% endif %}
+{% endblock %}
