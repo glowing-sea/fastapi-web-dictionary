@@ -1,5 +1,7 @@
 from __future__ import annotations
+
 from typing import List, Optional
+
 from app.data.vocab_repo import VocabRepo
 from app.models.vocab import Favourite, HistoryItem
 
@@ -7,16 +9,19 @@ class VocabService:
     def __init__(self, repo: VocabRepo):
         self.repo = repo
 
-    def add_or_update_favourite(self, user_id: int, dict_id: int, headword: str, notes: str) -> None:
+    # -------------------------
+    # Favourites (global vocab)
+    # -------------------------
+    def add_or_update_favourite(self, user_id: int, headword: str, notes: str) -> None:
         headword = headword.strip()
         if not headword:
             raise ValueError("Headword cannot be empty.")
         if len(notes) > 2000:
             raise ValueError("Notes too long (max 2000).")
-        self.repo.upsert_favourite(user_id, dict_id, headword, notes.strip())
+        self.repo.upsert_favourite(user_id, headword, notes.strip())
 
-    def list_favourites(self, user_id: int, dict_id: int | None = None) -> List[Favourite]:
-        return self.repo.list_favourites(user_id, dict_id)
+    def list_favourites(self, user_id: int) -> List[Favourite]:
+        return self.repo.list_favourites(user_id)
 
     def get_favourite(self, fav_id: int, user_id: int) -> Optional[Favourite]:
         return self.repo.get_favourite(fav_id, user_id)
@@ -29,6 +34,9 @@ class VocabService:
             raise ValueError("Notes too long (max 2000).")
         self.repo.update_favourite_notes(fav_id, user_id, notes.strip())
 
+    # -------------
+    # History
+    # -------------
     def add_history(self, user_id: int, dict_id: int, headword: str) -> None:
         headword = headword.strip()
         if headword:

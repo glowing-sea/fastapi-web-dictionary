@@ -47,3 +47,7 @@ button:hover { opacity: 0.92; }
 .table { width: 100%; border-collapse: collapse; }
 .table th, .table td { border-bottom: 1px solid #eee; padding: 10px; text-align: left; vertical-align: top; }
 code { background: #f3f3f3; padding: 2px 6px; border-radius: 8px; }
+
+
+/* Override some MDX dictionary CSS that disables text selection (e.g. IPA areas). */
+.definition, .definition * { -webkit-user-select: text !important; user-select: text !important; }

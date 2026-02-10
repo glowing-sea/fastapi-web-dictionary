@@ -67,7 +67,7 @@ def dictionary_search(request: Request, dict_id: int = Form(...), query: str = F
     result, err = None, None
     try:
         result = mdx_service.lookup(dict_id, query)
-        vocab_service.add_history(user.id, dict_id, result.headword)
+        vocab_service.add_history(user.id, dict_id, result.lookup_key)
     except DictLookupError as e:
         err = str(e)
     except Exception as e:
@@ -104,7 +104,7 @@ def dictionary_entry(request: Request, dict_id: int = Query(...), q: str = Query
     result, err = None, None
     try:
         result = mdx_service.lookup(dict_id, q)
-        vocab_service.add_history(user.id, dict_id, result.headword)
+        vocab_service.add_history(user.id, dict_id, result.lookup_key)
     except DictLookupError as e:
         err = str(e)
     except Exception as e:
@@ -134,7 +134,7 @@ def favourite_from_search(
     if redirect:
         return redirect
     try:
-        vocab_service.add_or_update_favourite(user.id, dict_id, headword, notes)
+        vocab_service.add_or_update_favourite(user.id, headword, notes)
     except Exception:
         pass
     return RedirectResponse(url=f"/vocab?dict_id={dict_id}&word={headword}", status_code=303)

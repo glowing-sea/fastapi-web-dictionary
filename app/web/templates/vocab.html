@@ -60,8 +60,14 @@
 
           <div class="card">
             <h3>Definition</h3>
-            {% if result %}
-              <div class="definition">{{ result.html | safe }}</div>
+            {% if result and result.found %}
+              <div class="hint">Showing {{ result.entries|length }} matching record(s) from the selected dictionary.</div>
+              {% for e in result.entries %}
+                <article class="card">
+                  <h4>{{ e.headword }}</h4>
+                  <div class="definition">{{ e.html | safe }}</div>
+                </article>
+              {% endfor %}
             {% else %}
               <p class="hint">No definition available.</p>
             {% endif %}

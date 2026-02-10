@@ -24,13 +24,26 @@ class DictLookupError(Exception):
 
 
 @dataclass(frozen=True)
-class LookupResult:
-    found: bool
+class EntryResult:
+    """One matching entry returned by an MDX lookup.
+
+    Bug fix (2): some dictionaries have *multiple* records for the same lookup key.
+    We keep every matching record and render them all.
+    """
     headword: str
     html: str
 
 
+@dataclass(frozen=True)
+class LookupResult:
+    """Lookup output used by Dictionary, Vocabulary and History pages."""
+    found: bool
+    lookup_key: str
+    entries: list[EntryResult]
+
+
 class MdxService:
+
     def __init__(self, dict_repo: DictRepo):
         self.dict_repo = dict_repo
 
@@ -87,7 +100,13 @@ class MdxService:
     # ----------------------------
     # Lookup (fixes: @@@LINK redirects + "I"/"me" case issues)
     # ----------------------------
+    
     def lookup(self, dict_id: int, word: str) -> LookupResult:
+        """Look up a word in an installed MDX dictionary.
+
+        Bug fix (2): some MDX dictionaries contain multiple records for the same key.
+        For example, looking up "I" could yield multiple entries. We return *all* of them.
+        """
         word = word.strip()
         if not word:
             raise DictLookupError("Please enter a word.")
@@ -105,73 +124,83 @@ class MdxService:
         exact_map, casefold_map = _get_mdx_maps_cached(dict_id, str(mdx_path))
 
         # 1) Exact match first
-        head = word
-        val_b = exact_map.get(head)
+        lookup_key = word
+        vals = exact_map.get(lookup_key)
 
-        # 2) Case-insensitive fallback (very important for dictionaries like Oxford)
-        if val_b is None:
+        # 2) Case-insensitive fallback (helps dictionaries where headwords are inconsistent)
+        if vals is None:
             cf = word.casefold()
             mapped = casefold_map.get(cf)
             if mapped is not None:
-                head = mapped
-                val_b = exact_map.get(head)
+                lookup_key = mapped
+                vals = exact_map.get(lookup_key)
 
-        if val_b is None:
-            return LookupResult(found=False, headword=word, html="<p><em>Not found.</em></p>")
+        if not vals:
+            return LookupResult(found=False, lookup_key=word, entries=[])
 
-        # Resolve MDX link chains like:
-        #   "me\n@@@LINK=mi"
-        # Some dictionaries store many common words as redirects.
-        resolved_head, resolved_val = self._resolve_mdx_link(exact_map, head, val_b)
+        # Each value record might itself be a redirect via '@@@LINK=target'.
+        # We resolve redirects, and if the resolved key has multiple values, we include them all.
+        entries: list[EntryResult] = []
+        seen: set[tuple[str, int]] = set()
 
-        html = rewrite_mdx_html(dict_id, _safe_decode(resolved_val))
-        return LookupResult(found=True, headword=resolved_head, html=html)
+        for v in vals:
+            resolved_head, resolved_vals = self._resolve_mdx_link(exact_map, lookup_key, v)
+            for rv in resolved_vals:
+                key = (resolved_head, hash(rv))
+                if key in seen:
+                    continue
+                seen.add(key)
+                html = rewrite_mdx_html(dict_id, _safe_decode(rv))
+                entries.append(EntryResult(headword=resolved_head, html=html))
 
-    def _resolve_mdx_link(self, exact_map: dict[str, bytes], head: str, val_b: bytes) -> tuple[str, bytes]:
+        return LookupResult(found=True, lookup_key=lookup_key, entries=entries)
+
+    def _resolve_mdx_link(
+        self,
+        exact_map: dict[str, list[bytes]],
+        head: str,
+        val_b: bytes,
+    ) -> tuple[str, list[bytes]]:
+        """Resolve MDX redirect records that contain '@@@LINK=target'.
+
+        Many dictionaries store common headwords as redirects, e.g.:
+
+            me
+@@@LINK=mi
+
+        We follow redirects up to a small depth to avoid infinite loops.
+
+        Bug fix (2): the resolved key may have *multiple* values. We return them all.
         """
-        Resolve MDX redirect records that contain '@@@LINK=target'.
-        We follow a few steps to avoid infinite loops.
-        """
-        seen = set()
+        seen: set[str] = set()
         cur_head = head
         cur_val = val_b
 
         for _ in range(10):  # max depth
             text = _safe_decode(cur_val)
 
-            # Look for a LINK marker anywhere (often on line 2)
-            # examples:
-            #   "@@@LINK=mi"
-            #   "me\\n@@@LINK=mi"
-            m = re.search(r"@@@LINK=(.+)", text)
+            m = re.search(r"@@@LINK=(?P<target>.+)", text)
             if not m:
-                break
+                return cur_head, [cur_val]
 
-            target = m.group(1).strip()
-            # Some have extra trailing junk after the target
-            target = target.splitlines()[0].strip()
-            if not target:
-                break
+            target = m.group("target").strip()
+            if not target or target in seen:
+                return cur_head, [cur_val]
 
-            # Prevent loops
-            key = (cur_head, target)
-            if key in seen:
-                break
-            seen.add(key)
-
-            # Follow redirect
-            nxt = exact_map.get(target)
-            if nxt is None:
-                # If redirect target missing, stop and show what we have
-                break
+            seen.add(target)
             cur_head = target
-            cur_val = nxt
 
-        return cur_head, cur_val
+            target_vals = exact_map.get(target)
+            if not target_vals:
+                return cur_head, [cur_val]
 
-    # ----------------------------
-    # Asset serving (fixes: images + sound files; supports files in MDD)
-    # ----------------------------
+            # Continue resolving by inspecting the first value,
+            # but if we finish, we'll return the full list.
+            cur_val = target_vals[0]
+
+        # if we hit max depth, return the current value
+        return cur_head, [cur_val]
+
     def get_asset_bytes(self, dict_id: int, asset_path: str) -> Tuple[bytes, str]:
         """
         Serve an asset referenced by MDX HTML (img/css/js/audio).
@@ -236,21 +265,28 @@ class MdxService:
 # Caches
 # ----------------------------
 @lru_cache(maxsize=8)
-def _get_mdx_maps_cached(dict_id: int, mdx_path: str) -> tuple[dict[str, bytes], dict[str, str]]:
-    """
-    Return:
-    - exact_map: headword -> bytes
-    - casefold_map: casefold(headword) -> a representative headword
 
-    This makes "I" vs "i" and common words work better for certain dictionaries.
+@lru_cache(maxsize=8)
+def _get_mdx_maps_cached(dict_id: int, mdx_path: str) -> tuple[dict[str, list[bytes]], dict[str, str]]:
+    """Build lookup maps for an MDX file.
+
+    Returns:
+      - exact_map: headword -> list[bytes]   (Bug fix (2): keep *all* records for a key)
+      - casefold_map: casefold(headword) -> a representative headword
+
+    Why we build maps instead of calling mdx.lookup() every time:
+      - mdx.lookup() is convenient but repeated calls are slower.
+      - keeping our own map also lets us handle the "multiple values per key" bug.
     """
     mdx = MDX(mdx_path)
-    exact: dict[str, bytes] = {}
+    exact: dict[str, list[bytes]] = {}
     casefold_map: dict[str, str] = {}
 
     for k, v in mdx.items():
         ks = _safe_decode(k)
-        exact[ks] = v
+
+        # Bug fix (2): store every record under the same key.
+        exact.setdefault(ks, []).append(v)
 
         cf = ks.casefold()
         # keep first seen representative (stable)

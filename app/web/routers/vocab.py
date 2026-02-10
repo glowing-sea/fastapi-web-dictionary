@@ -35,6 +35,12 @@ def _dict_css_url(dict_id: int | None) -> str | None:
 
 @router.get("/vocab", response_class=HTMLResponse)
 def vocab_home(request: Request, dict_id: int | None = None, fav_id: int | None = None, word: str | None = None):
+    """Vocabulary book page.
+
+    Bug fix:
+    - favourites must always be defined (previous version only defined it when dict_id was None),
+      which crashed when clicking a word (e.g. /vocab?dict_id=2&fav_id=1).
+    """
     user, redirect = _require_user(request)
     if redirect:
         return redirect
@@ -43,7 +49,8 @@ def vocab_home(request: Request, dict_id: int | None = None, fav_id: int | None 
     if dict_id is None and dicts:
         dict_id = dicts[0].id
 
-    favourites = vocab_service.list_favourites(user.id, dict_id if dict_id else None)
+    # In this version of the app, favourites are *global* (not per-dictionary).
+    favourites = vocab_service.list_favourites(user.id)
 
     selected = vocab_service.get_favourite(fav_id, user.id) if fav_id is not None else None
     if selected is None and word and favourites:

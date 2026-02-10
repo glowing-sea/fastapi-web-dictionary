@@ -25,21 +25,33 @@
       <p class="hint">Tip: searches are case-sensitive in many MDX dictionaries.</p>
     </section>
 
-    {% if result %}
-      <section class="card">
-        <div class="row space-between">
-          <h2>{{ result.headword }}</h2>
-          {% if result.found %}
-            <form method="post" action="/dictionary/favourite" class="row">
-              <input type="hidden" name="dict_id" value="{{ selected_dict_id }}" />
-              <input type="hidden" name="headword" value="{{ result.headword }}" />
-              <input name="notes" placeholder="Optional notes..." class="notesinput" />
-              <button type="submit">⭐ Favourite</button>
-            </form>
-          {% endif %}
-        </div>
-        <div class="definition">{{ result.html | safe }}</div>
-      </section>
+    
+{% if result %}
+  <section class="card">
+    <div class="row space-between">
+      <h2>Matches for: {{ result.lookup_key }}</h2>
+      {% if result.found %}
+        <form method="post" action="/dictionary/favourite" class="row">
+          <input type="hidden" name="dict_id" value="{{ selected_dict_id }}" />
+          <input type="hidden" name="headword" value="{{ result.lookup_key }}" />
+          <input name="notes" placeholder="Optional notes..." class="notesinput" />
+          <button type="submit">⭐ Favourite</button>
+        </form>
+      {% endif %}
+    </div>
+
+    {% if not result.found %}
+      <p><em>Not found.</em></p>
+    {% else %}
+      <div class="hint">Showing {{ result.entries|length }} matching record(s).</div>
+      {% for e in result.entries %}
+        <article class="card">
+          <h3>{{ e.headword }}</h3>
+          <div class="definition">{{ e.html | safe }}</div>
+        </article>
+      {% endfor %}
     {% endif %}
-  {% endif %}
+  </section>
+{% endif %}
+{% endif %}
 {% endblock %}
