@@ -6,14 +6,21 @@ from typing import List, Optional
 from app.db.database import get_conn
 from app.models.vocab import Favourite, HistoryItem
 
+
 class VocabRepo:
+    """Data access layer for:
+    - favourites (global vocabulary per user)
+    - history (per user, per dictionary)
+    """
+
     # -------------------------
     # Favourites (global vocab)
     # -------------------------
     def upsert_favourite(self, user_id: int, headword: str, notes: str) -> None:
         """Insert or update a favourite word.
 
-        Bug fix (1): favourites are global, so the unique key is (user_id, headword).
+        In this codebase, favourites are *global* (not per dictionary).
+        Unique key: (user_id, headword).
         """
         now = datetime.now(timezone.utc).isoformat()
         with get_conn() as conn:
@@ -66,9 +73,34 @@ class VocabRepo:
             created_at=r["created_at"],
         )
 
+    def get_favourite_by_word(self, user_id: int, headword: str) -> Optional[Favourite]:
+        """Find a favourite by (user_id, headword)."""
+        with get_conn() as conn:
+            r = conn.execute(
+                """SELECT id, user_id, headword, notes, created_at
+                     FROM favourites
+                     WHERE user_id = ? AND headword = ?""",
+                (user_id, headword),
+            ).fetchone()
+
+        if not r:
+            return None
+
+        return Favourite(
+            id=r["id"],
+            user_id=r["user_id"],
+            headword=r["headword"],
+            notes=r["notes"],
+            created_at=r["created_at"],
+        )
+
     def delete_favourite(self, fav_id: int, user_id: int) -> None:
         with get_conn() as conn:
             conn.execute("DELETE FROM favourites WHERE id = ? AND user_id = ?", (fav_id, user_id))
+
+    def delete_all_favourites(self, user_id: int) -> None:
+        with get_conn() as conn:
+            conn.execute("DELETE FROM favourites WHERE user_id = ?", (user_id,))
 
     def update_favourite_notes(self, fav_id: int, user_id: int, notes: str) -> None:
         with get_conn() as conn:

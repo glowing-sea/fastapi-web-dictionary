@@ -8,7 +8,8 @@
       <p class="hint">Ask an admin to upload an MDX ZIP in Admin: Dictionaries.</p>
     </div>
   {% else %}
-    <div class="row">
+
+    <div class="row space-between">
       <form method="get" action="/vocab" class="row">
         <label class="row">Dictionary:
           <select name="dict_id" onchange="this.form.submit()">
@@ -18,21 +19,42 @@
           </select>
         </label>
       </form>
+
+      <div class="row">
+        <a class="button" href="/vocab/export?dict_id={{ selected_dict_id }}">Export JSON</a>
+        <form method="post" action="/vocab/clear" onsubmit="return confirm('Delete ALL vocabulary?');">
+          <input type="hidden" name="dict_id" value="{{ selected_dict_id }}" />
+          <button class="danger" type="submit">Delete all</button>
+        </form>
+      </div>
     </div>
+
+    <section class="card">
+      <h2>Import JSON</h2>
+      <p class="hint">JSON format: <code>[{"word":"apple","notes":"..."}, ...]</code>. Existing words will have their notes overwritten.</p>
+      <form method="post" action="/vocab/import" enctype="multipart/form-data" class="row">
+        <input type="hidden" name="dict_id" value="{{ selected_dict_id }}" />
+        <input type="file" name="json_file" accept="application/json,.json" required />
+        <button type="submit">Import</button>
+      </form>
+    </section>
 
     <div class="split">
       <aside class="panel">
         <h2>Words</h2>
         {% if favourites|length == 0 %}
-          <p class="hint">No favourites yet. Search a word and click ⭐ Favourite.</p>
+          <p class="hint">No favourites yet. Search a word and click ☆ Favourite.</p>
         {% else %}
-          <ul class="list">
-            {% for f in favourites %}
-              <li class="{% if selected_fav and selected_fav.id == f.id %}active{% endif %}">
-                <a href="/vocab?dict_id={{ selected_dict_id }}&fav_id={{ f.id }}">{{ f.headword }}</a>
-              </li>
-            {% endfor %}
-          </ul>
+          <div class="list-scroll">
+            <ul class="list">
+              {% for f in favourites %}
+                <li class="{% if selected_fav and selected_fav.id == f.id %}active{% endif %} clickable"
+                    onclick="window.location.href='/vocab?dict_id={{ selected_dict_id }}&fav_id={{ f.id }}';">
+                  <a href="/vocab?dict_id={{ selected_dict_id }}&fav_id={{ f.id }}">{{ f.headword }}</a>
+                </li>
+              {% endfor %}
+            </ul>
+          </div>
         {% endif %}
       </aside>
 
@@ -40,7 +62,7 @@
         {% if selected_fav %}
           <div class="row space-between">
             <h2>{{ selected_fav.headword }}</h2>
-            <form method="post" action="/vocab/{{ selected_fav.id }}/delete">
+            <form method="post" action="/vocab/{{ selected_fav.id }}/delete" onclick="event.stopPropagation();">
               <input type="hidden" name="dict_id" value="{{ selected_dict_id }}" />
               <button class="danger" type="submit">Remove</button>
             </form>
@@ -53,7 +75,7 @@
               <textarea name="notes" rows="5" maxlength="2000">{{ selected_fav.notes }}</textarea>
               <div class="row">
                 <button type="submit">Save notes</button>
-                <span class="hint">Notes are per favourite entry.</span>
+                <span class="hint">Notes are stored in your vocabulary.</span>
               </div>
             </form>
           </div>
@@ -62,14 +84,48 @@
             <h3>Definition</h3>
             {% if result and result.found %}
               <div class="hint">Showing {{ result.entries|length }} matching record(s) from the selected dictionary.</div>
+
               {% for e in result.entries %}
                 <article class="card">
                   <h4>{{ e.headword }}</h4>
-                  <div class="definition">{{ e.html | safe }}</div>
+
+                  <div class="definition">
+                    <div id="def-{{ loop.index0 }}"></div>
+                  </div>
+
+                  <script>
+                    (function() {
+                      const host = document.getElementById("def-{{ loop.index0 }}");
+                      if (!host) return;
+
+                      const root = host.attachShadow({ mode: "open" });
+                      const html = {{ e.html | tojson }};
+                      const cssUrl = {{ dict_css_url | tojson }};
+
+                      const baseStyle = document.createElement('style');
+                      baseStyle.textContent = `
+                        :host { display: block; }
+                        img { max-width: 100%; height: auto; }
+                        * { user-select: text !important; -webkit-user-select: text !important; }
+                      `;
+                      root.appendChild(baseStyle);
+
+                      if (cssUrl) {
+                        const link = document.createElement('link');
+                        link.rel = 'stylesheet';
+                        link.href = cssUrl;
+                        root.appendChild(link);
+                      }
+
+                      const wrap = document.createElement('div');
+                      wrap.innerHTML = html;
+                      root.appendChild(wrap);
+                    })();
+                  </script>
                 </article>
               {% endfor %}
             {% else %}
-              <p class="hint">No definition available.</p>
+              <p class="hint">No definition available in the selected dictionary.</p>
             {% endif %}
           </div>
         {% else %}

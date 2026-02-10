@@ -25,33 +25,92 @@
       <p class="hint">Tip: searches are case-sensitive in many MDX dictionaries.</p>
     </section>
 
-    
-{% if result %}
-  <section class="card">
-    <div class="row space-between">
-      <h2>Matches for: {{ result.lookup_key }}</h2>
-      {% if result.found %}
-        <form method="post" action="/dictionary/favourite" class="row">
-          <input type="hidden" name="dict_id" value="{{ selected_dict_id }}" />
-          <input type="hidden" name="headword" value="{{ result.lookup_key }}" />
-          <input name="notes" placeholder="Optional notes..." class="notesinput" />
-          <button type="submit">⭐ Favourite</button>
-        </form>
-      {% endif %}
-    </div>
+    {% if result %}
+      <section class="card">
+        <div class="row space-between">
+          <h2>Matches for: {{ result.lookup_key }}</h2>
 
-    {% if not result.found %}
-      <p><em>Not found.</em></p>
-    {% else %}
-      <div class="hint">Showing {{ result.entries|length }} matching record(s).</div>
-      {% for e in result.entries %}
-        <article class="card">
-          <h3>{{ e.headword }}</h3>
-          <div class="definition">{{ e.html | safe }}</div>
-        </article>
-      {% endfor %}
+          {% if result.found %}
+            {% if favourite %}
+              <form method="post" action="/dictionary/favourite" class="row">
+                <input type="hidden" name="dict_id" value="{{ selected_dict_id }}" />
+                <input type="hidden" name="headword" value="{{ result.lookup_key }}" />
+                <input name="notes" placeholder="Notes..." class="notesinput" value="{{ favourite.notes }}" />
+                <button type="submit">★ Favourited (Save)</button>
+              </form>
+            {% else %}
+              <form method="post" action="/dictionary/favourite" class="row">
+                <input type="hidden" name="dict_id" value="{{ selected_dict_id }}" />
+                <input type="hidden" name="headword" value="{{ result.lookup_key }}" />
+                <input name="notes" placeholder="Optional notes..." class="notesinput" />
+                <button type="submit">☆ Favourite</button>
+              </form>
+            {% endif %}
+          {% endif %}
+        </div>
+
+        {% if not result.found %}
+          <p><em>Not found.</em></p>
+        {% else %}
+          {% if favourite %}
+            <div class="card" style="margin-top: 10px;">
+              <h3>Notes</h3>
+              <form method="post" action="/dictionary/favourite">
+                <input type="hidden" name="dict_id" value="{{ selected_dict_id }}" />
+                <input type="hidden" name="headword" value="{{ result.lookup_key }}" />
+                <textarea name="notes" rows="4" maxlength="2000">{{ favourite.notes }}</textarea>
+                <div class="row">
+                  <button type="submit">Save notes</button>
+                  <span class="hint">This word is already in your vocabulary.</span>
+                </div>
+              </form>
+            </div>
+          {% endif %}
+
+          <div class="hint">Showing {{ result.entries|length }} matching record(s).</div>
+
+          {% for e in result.entries %}
+            <article class="card">
+              <h3>{{ e.headword }}</h3>
+
+              <div class="definition">
+                <div id="def-{{ loop.index0 }}"></div>
+              </div>
+
+              <script>
+                (function() {
+                  const host = document.getElementById("def-{{ loop.index0 }}");
+                  if (!host) return;
+
+                  // Shadow DOM isolates dictionary CSS so it won't affect the whole page.
+                  const root = host.attachShadow({ mode: "open" });
+                  const html = {{ e.html | tojson }};
+                  const cssUrl = {{ dict_css_url | tojson }};
+
+                  const baseStyle = document.createElement('style');
+                  baseStyle.textContent = `
+                    :host { display: block; }
+                    img { max-width: 100%; height: auto; }
+                    * { user-select: text !important; -webkit-user-select: text !important; }
+                  `;
+                  root.appendChild(baseStyle);
+
+                  if (cssUrl) {
+                    const link = document.createElement('link');
+                    link.rel = 'stylesheet';
+                    link.href = cssUrl;
+                    root.appendChild(link);
+                  }
+
+                  const wrap = document.createElement('div');
+                  wrap.innerHTML = html;
+                  root.appendChild(wrap);
+                })();
+              </script>
+            </article>
+          {% endfor %}
+        {% endif %}
+      </section>
     {% endif %}
-  </section>
-{% endif %}
-{% endif %}
+  {% endif %}
 {% endblock %}

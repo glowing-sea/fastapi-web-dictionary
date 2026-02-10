@@ -65,9 +65,12 @@ def dictionary_search(request: Request, dict_id: int = Form(...), query: str = F
     dicts = mdx_service.list_dicts()
 
     result, err = None, None
+    favourite = None
     try:
         result = mdx_service.lookup(dict_id, query)
         vocab_service.add_history(user.id, dict_id, result.lookup_key)
+        if result and result.found:
+            favourite = vocab_service.get_favourite_by_word(user_id=user.id, headword=result.lookup_key)
     except DictLookupError as e:
         err = str(e)
     except Exception as e:
@@ -84,6 +87,7 @@ def dictionary_search(request: Request, dict_id: int = Form(...), query: str = F
             "query": query,
             "result": result,
             "error": err,
+            "favourite": favourite,
         },
         status_code=200 if not err else 400,
     )
@@ -102,9 +106,12 @@ def dictionary_entry(request: Request, dict_id: int = Query(...), q: str = Query
     dicts = mdx_service.list_dicts()
 
     result, err = None, None
+    favourite = None
     try:
         result = mdx_service.lookup(dict_id, q)
         vocab_service.add_history(user.id, dict_id, result.lookup_key)
+        if result and result.found:
+            favourite = vocab_service.get_favourite_by_word(user_id=user.id, headword=result.lookup_key)
     except DictLookupError as e:
         err = str(e)
     except Exception as e:
@@ -121,6 +128,7 @@ def dictionary_entry(request: Request, dict_id: int = Query(...), q: str = Query
             "query": q,
             "result": result,
             "error": err,
+            "favourite": favourite,
         },
         status_code=200 if not err else 400,
     )

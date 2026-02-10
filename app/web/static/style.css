@@ -51,3 +51,13 @@ code { background: #f3f3f3; padding: 2px 6px; border-radius: 8px; }
 
 /* Override some MDX dictionary CSS that disables text selection (e.g. IPA areas). */
 .definition, .definition * { -webkit-user-select: text !important; user-select: text !important; }
+
+
+/* Keep vocab/history layouts usable when lists are long:
+   - The overall page shouldn't require massive scrolling.
+   - The left list scrolls inside its own container.
+*/
+.split { height: calc(100vh - 170px); align-items: start; }
+.list-scroll { max-height: calc(100vh - 300px); overflow-y: auto; padding-right: 6px; }
+.clickable { cursor: pointer; }
+.clickable:hover { box-shadow: 0 1px 0 rgba(0,0,0,0.06); }

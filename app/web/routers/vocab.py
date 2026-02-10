@@ -1,6 +1,7 @@
 from __future__ import annotations
-from fastapi import APIRouter, Request, Form
-from fastapi.responses import HTMLResponse, RedirectResponse
+import json
+from fastapi import APIRouter, Request, Form, UploadFile, File
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from app.web.dependencies import get_current_user
@@ -101,3 +102,51 @@ def update_notes(request: Request, fav_id: int, dict_id: int = Form(...), notes:
     except Exception:
         pass
     return RedirectResponse(url=f"/vocab?dict_id={dict_id}&fav_id={fav_id}", status_code=303)
+
+@router.post("/vocab/clear")
+def clear_all_favs(request: Request, dict_id: int = Form(...)):
+    """Delete all favourites in the selected dictionary."""
+    user, redirect = _require_user(request)
+    if redirect:
+        return redirect
+    vocab_service.delete_all_favourites(user_id=user.id)
+    return RedirectResponse(url=f"/vocab?dict_id={dict_id}", status_code=303)
+
+@router.get("/vocab/export")
+def export_vocab(request: Request, dict_id: int):
+    """Export favourites as JSON (word + notes)."""
+    user, redirect = _require_user(request)
+    if redirect:
+        return redirect
+
+    favs = vocab_service.list_favourites(user.id)
+    payload = [{"word": f.headword, "notes": f.notes} for f in favs]
+    data = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+
+    filename = f"vocabulary_dict_{dict_id}.json"
+    return Response(
+        content=data,
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+@router.post("/vocab/import")
+async def import_vocab(request: Request, dict_id: int = Form(...), json_file: UploadFile = File(...)):
+    """Import favourites from uploaded JSON file.
+
+    If a favourite already exists, its notes are overwritten.
+    """
+    user, redirect = _require_user(request)
+    if redirect:
+        return redirect
+
+    raw = await json_file.read()
+    try:
+        items = json.loads(raw.decode("utf-8"))
+        if not isinstance(items, list):
+            raise ValueError("JSON must be a list.")
+    except Exception:
+        return RedirectResponse(url=f"/vocab?dict_id={dict_id}", status_code=303)
+
+    vocab_service.import_favourites(user_id=user.id, items=items)
+    return RedirectResponse(url=f"/vocab?dict_id={dict_id}", status_code=303)
