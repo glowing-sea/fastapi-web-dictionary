@@ -28,46 +28,107 @@
     {% if result %}
       <section class="card">
         <div class="row space-between">
-          <h2>Matches for: {{ result.lookup_key }}</h2>
+          <h2>Matches for: {{ query }}</h2>
 
-          {% if result.found %}
-            {% if favourite %}
-              <form method="post" action="/dictionary/favourite" class="row">
-                <input type="hidden" name="dict_id" value="{{ selected_dict_id }}" />
-                <input type="hidden" name="headword" value="{{ result.lookup_key }}" />
-                <input name="notes" placeholder="Notes..." class="notesinput" value="{{ favourite.notes }}" />
-                <button type="submit">★ Favourited (Save)</button>
-              </form>
-            {% else %}
-              <form method="post" action="/dictionary/favourite" class="row">
-                <input type="hidden" name="dict_id" value="{{ selected_dict_id }}" />
-                <input type="hidden" name="headword" value="{{ result.lookup_key }}" />
-                <input name="notes" placeholder="Optional notes..." class="notesinput" />
-                <button type="submit">☆ Favourite</button>
-              </form>
-            {% endif %}
-          {% endif %}
-        </div>
+          
+  {% if query %}
+  {% if favourite %}
+    <div class="row" style="align-items:center; gap:10px; width: 100%;">
+      <!-- Mastery controls (immediate updates) -->
+      <form method="post" action="/dictionary/mastery_dec" class="inline">
+        <input type="hidden" name="dict_id" value="{{ selected_dict_id }}" />
+        <input type="hidden" name="headword" value="{{ query }}" />
+        <input type="hidden" name="fav_id" value="{{ favourite.id }}" />
+        <button type="submit" class="button">-</button>
+      </form>
+
+      <div class="hint" style="min-width:110px; text-align:center;">
+        Mastery: <strong>{{ favourite.mastery }}</strong> / 5
+      </div>
+
+      <form method="post" action="/dictionary/mastery_inc" class="inline">
+        <input type="hidden" name="dict_id" value="{{ selected_dict_id }}" />
+        <input type="hidden" name="headword" value="{{ query }}" />
+        <input type="hidden" name="fav_id" value="{{ favourite.id }}" />
+        <button type="submit" class="button">+</button>
+      </form>
+
+      <!-- Notes + Save -->
+      <form method="post" action="/dictionary/favourite" class="row" style="flex:1; gap:8px;">
+        <input type="hidden" name="dict_id" value="{{ selected_dict_id }}" />
+        <input type="hidden" name="headword" value="{{ query }}" />
+        <!-- mastery included for consistency; keeps existing mastery if user doesn't change it -->
+        <input type="hidden" name="mastery" value="{{ favourite.mastery }}" />
+        <input name="notes" placeholder="Notes..." class="notesinput" value="{{ favourite.notes }}" style="flex:1;" />
+        <button type="submit">Save</button>
+      </form>
+
+      <!-- Toggle favourite (asks for confirmation) -->
+      <form method="post" action="/dictionary/unfavourite" class="inline"
+            onsubmit="return confirm('Unfavourite this word?');">
+        <input type="hidden" name="dict_id" value="{{ selected_dict_id }}" />
+        <input type="hidden" name="headword" value="{{ query }}" />
+        <input type="hidden" name="fav_id" value="{{ favourite.id }}" />
+        <button type="submit">★</button>
+      </form>
+    </div>
+  {% else %}
+    <div class="row" style="align-items:center; gap:10px; width: 100%;">
+      <!-- Mastery controls (client-side only until saved) -->
+      <button type="button" class="button" onclick="decMastery()">-</button>
+      <div class="hint" style="min-width:110px; text-align:center;">
+        Mastery: <strong id="mval">1</strong> / 5
+      </div>
+      <button type="button" class="button" onclick="incMastery()">+</button>
+
+      <form method="post" action="/dictionary/favourite" class="row" style="flex:1; gap:8px;">
+        <input type="hidden" name="dict_id" value="{{ selected_dict_id }}" />
+        <input type="hidden" name="headword" value="{{ query }}" />
+        <input type="hidden" name="mastery" id="mastery" value="1" />
+        <input name="notes" placeholder="Optional notes..." class="notesinput" style="flex:1;" />
+        <button type="submit">☆ Favourite</button>
+      </form>
+    </div>
+
+    <script>
+      (function() {
+        let m = 1;
+        const mval = document.getElementById("mval");
+        const hidden = document.getElementById("mastery");
+        window.incMastery = function() {
+          m = Math.min(5, m + 1);
+          mval.textContent = String(m);
+          hidden.value = String(m);
+        }
+        window.decMastery = function() {
+          m = Math.max(1, m - 1);
+          mval.textContent = String(m);
+          hidden.value = String(m);
+        }
+      })();
+    </script>
+  {% endif %}
+{% endif %}
+</div>
 
         {% if not result.found %}
           <p><em>Not found.</em></p>
         {% else %}
-          {% if favourite %}
-            <div class="card" style="margin-top: 10px;">
-              <h3>Notes</h3>
-              <form method="post" action="/dictionary/favourite">
-                <input type="hidden" name="dict_id" value="{{ selected_dict_id }}" />
-                <input type="hidden" name="headword" value="{{ result.lookup_key }}" />
-                <textarea name="notes" rows="4" maxlength="2000">{{ favourite.notes }}</textarea>
-                <div class="row">
-                  <button type="submit">Save notes</button>
-                  <span class="hint">This word is already in your vocabulary.</span>
-                </div>
-              </form>
-            </div>
-          {% endif %}
+                    <div class="hint">Showing {{ result.entries|length }} matching record(s).</div>
 
-          <div class="hint">Showing {{ result.entries|length }} matching record(s).</div>
+{% if favourite %}
+  <div class="card" style="margin-top: 10px;">
+    <form method="post" action="/dictionary/favourite">
+      <input type="hidden" name="dict_id" value="{{ selected_dict_id }}" />
+      <input type="hidden" name="headword" value="{{ query }}" />
+      <input type="hidden" name="mastery" value="{{ favourite.mastery }}" />
+      <textarea name="notes" rows="10" maxlength="2000" placeholder="Notes...">{{ favourite.notes }}</textarea>
+      <div class="row">
+        <button type="submit">Save notes</button>
+      </div>
+    </form>
+  </div>
+{% endif %}
 
           {% for e in result.entries %}
             <article class="card">

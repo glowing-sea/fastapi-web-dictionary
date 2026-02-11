@@ -50,6 +50,7 @@
       </aside>
 
       <section class="panel">
+        <div class="rhs-scroll">
         {% if selected_item %}
           <h2>{{ selected_item.headword }}</h2>
 
@@ -104,6 +105,7 @@
         {% else %}
           <p class="hint">Select an item on the left.</p>
         {% endif %}
+        </div>
       </section>
     </div>
   {% endif %}

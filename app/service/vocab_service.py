@@ -18,13 +18,15 @@ class VocabService:
     # -------------------------
     # Favourites (global vocab)
     # -------------------------
-    def add_or_update_favourite(self, user_id: int, headword: str, notes: str) -> None:
+    def add_or_update_favourite(self, user_id: int, headword: str, notes: str, mastery: int = 1, created_at: str | None = None) -> None:
         headword = headword.strip()
         if not headword:
             raise ValueError("Headword cannot be empty.")
+        if not (1 <= mastery <= 5):
+            raise ValueError('Mastery must be 1..5.')
         if len(notes) > 2000:
             raise ValueError("Notes too long (max 2000).")
-        self.repo.upsert_favourite(user_id, headword, notes.strip())
+        self.repo.upsert_favourite(user_id, headword, notes.strip(), mastery, created_at=created_at)
 
     def list_favourites(self, user_id: int) -> List[Favourite]:
         return self.repo.list_favourites(user_id)
@@ -41,10 +43,17 @@ class VocabService:
     def delete_all_favourites(self, user_id: int) -> None:
         self.repo.delete_all_favourites(user_id)
 
+    def update_mastery(self, fav_id: int, user_id: int, mastery: int) -> None:
+        if not (1 <= mastery <= 5):
+            raise ValueError('Mastery must be 1..5.')
+        self.repo.update_favourite_mastery(fav_id, user_id, mastery)
+
     def update_notes(self, fav_id: int, user_id: int, notes: str) -> None:
         if len(notes) > 2000:
             raise ValueError("Notes too long (max 2000).")
         self.repo.update_favourite_notes(fav_id, user_id, notes.strip())
+
+
 
     def import_favourites(self, user_id: int, items: list[dict]) -> int:
         """Import favourites from JSON list.
@@ -56,9 +65,11 @@ class VocabService:
         for it in items:
             word = str(it.get("word", "")).strip()
             notes = str(it.get("notes", "")).strip()
+            mastery = int(it.get("mastery", 1) or 1)
+            created_at = it.get("created_at")
             if not word:
                 continue
-            self.add_or_update_favourite(user_id=user_id, headword=word, notes=notes)
+            self.add_or_update_favourite(user_id=user_id, headword=word, notes=notes, mastery=mastery, created_at=created_at)
             count += 1
         return count
 

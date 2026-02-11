@@ -8,34 +8,36 @@ from app.models.vocab import Favourite, HistoryItem
 
 
 class VocabRepo:
-    """Data access layer for:
-    - favourites (global vocabulary per user)
-    - history (per user, per dictionary)
-    """
+    """SQL-only data access for favourites (vocabulary) + history."""
 
     # -------------------------
     # Favourites (global vocab)
     # -------------------------
-    def upsert_favourite(self, user_id: int, headword: str, notes: str) -> None:
-        """Insert or update a favourite word.
-
-        In this codebase, favourites are *global* (not per dictionary).
-        Unique key: (user_id, headword).
-        """
-        now = datetime.now(timezone.utc).isoformat()
+    def upsert_favourite(
+        self,
+        user_id: int,
+        headword: str,
+        notes: str,
+        mastery: int,
+        created_at: str | None = None,
+    ) -> None:
+        now = created_at or datetime.now(timezone.utc).isoformat()
         with get_conn() as conn:
             conn.execute(
-                """INSERT INTO favourites (user_id, headword, notes, created_at)
-                     VALUES (?, ?, ?, ?)
+                """INSERT INTO favourites (user_id, headword, notes, mastery, created_at)
+                     VALUES (?, ?, ?, ?, ?)
                      ON CONFLICT(user_id, headword)
-                     DO UPDATE SET notes=excluded.notes, created_at=excluded.created_at""",
-                (user_id, headword, notes, now),
+                     DO UPDATE SET
+                        notes=excluded.notes,
+                        mastery=excluded.mastery,
+                        created_at=excluded.created_at""",
+                (user_id, headword, notes, mastery, now),
             )
 
     def list_favourites(self, user_id: int) -> List[Favourite]:
         with get_conn() as conn:
             rows = conn.execute(
-                """SELECT id, user_id, headword, notes, created_at
+                """SELECT id, user_id, headword, notes, mastery, created_at
                      FROM favourites
                      WHERE user_id = ?
                      ORDER BY headword COLLATE NOCASE ASC""",
@@ -48,6 +50,7 @@ class VocabRepo:
                 user_id=r["user_id"],
                 headword=r["headword"],
                 notes=r["notes"],
+                mastery=r["mastery"],
                 created_at=r["created_at"],
             )
             for r in rows
@@ -56,7 +59,7 @@ class VocabRepo:
     def get_favourite(self, fav_id: int, user_id: int) -> Optional[Favourite]:
         with get_conn() as conn:
             r = conn.execute(
-                """SELECT id, user_id, headword, notes, created_at
+                """SELECT id, user_id, headword, notes, mastery, created_at
                      FROM favourites
                      WHERE id = ? AND user_id = ?""",
                 (fav_id, user_id),
@@ -70,16 +73,16 @@ class VocabRepo:
             user_id=r["user_id"],
             headword=r["headword"],
             notes=r["notes"],
+            mastery=r["mastery"],
             created_at=r["created_at"],
         )
 
     def get_favourite_by_word(self, user_id: int, headword: str) -> Optional[Favourite]:
-        """Find a favourite by (user_id, headword)."""
         with get_conn() as conn:
             r = conn.execute(
-                """SELECT id, user_id, headword, notes, created_at
+                """SELECT id, user_id, headword, notes, mastery, created_at
                      FROM favourites
-                     WHERE user_id = ? AND headword = ?""",
+                     WHERE user_id = ? AND headword COLLATE BINARY = ? COLLATE BINARY""",
                 (user_id, headword),
             ).fetchone()
 
@@ -91,6 +94,7 @@ class VocabRepo:
             user_id=r["user_id"],
             headword=r["headword"],
             notes=r["notes"],
+            mastery=r["mastery"],
             created_at=r["created_at"],
         )
 
@@ -107,6 +111,13 @@ class VocabRepo:
             conn.execute(
                 "UPDATE favourites SET notes = ? WHERE id = ? AND user_id = ?",
                 (notes, fav_id, user_id),
+            )
+
+    def update_favourite_mastery(self, fav_id: int, user_id: int, mastery: int) -> None:
+        with get_conn() as conn:
+            conn.execute(
+                "UPDATE favourites SET mastery = ? WHERE id = ? AND user_id = ?",
+                (mastery, fav_id, user_id),
             )
 
     # -------------

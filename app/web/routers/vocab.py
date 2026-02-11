@@ -35,7 +35,7 @@ def _dict_css_url(dict_id: int | None) -> str | None:
 
 
 @router.get("/vocab", response_class=HTMLResponse)
-def vocab_home(request: Request, dict_id: int | None = None, fav_id: int | None = None, word: str | None = None):
+def vocab_home(request: Request, dict_id: int | None = None, fav_id: int | None = None, word: str | None = None, sort_by: str = 'alpha', order: str = 'asc'):
     """Vocabulary book page.
 
     Bug fix:
@@ -52,6 +52,15 @@ def vocab_home(request: Request, dict_id: int | None = None, fav_id: int | None 
 
     # In this version of the app, favourites are *global* (not per-dictionary).
     favourites = vocab_service.list_favourites(user.id)
+
+    rev = (order.lower() == 'desc')
+    key = sort_by.lower()
+    if key == 'date':
+        favourites = sorted(favourites, key=lambda f: f.created_at, reverse=rev)
+    elif key == 'mastery':
+        favourites = sorted(favourites, key=lambda f: f.mastery, reverse=rev)
+    else:
+        favourites = sorted(favourites, key=lambda f: f.headword.casefold(), reverse=rev)
 
     selected = vocab_service.get_favourite(fav_id, user.id) if fav_id is not None else None
     if selected is None and word and favourites:
@@ -79,6 +88,8 @@ def vocab_home(request: Request, dict_id: int | None = None, fav_id: int | None 
             "selected_fav": selected,
             "result": result,
             "error": err,
+            "sort_by": sort_by,
+            "order": order,
         },
     )
 
@@ -120,7 +131,7 @@ def export_vocab(request: Request, dict_id: int):
         return redirect
 
     favs = vocab_service.list_favourites(user.id)
-    payload = [{"word": f.headword, "notes": f.notes} for f in favs]
+    payload = [{"word": f.headword, "notes": f.notes, "mastery": f.mastery, "created_at": f.created_at} for f in favs]
     data = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
 
     filename = f"vocabulary_dict_{dict_id}.json"
@@ -150,3 +161,27 @@ async def import_vocab(request: Request, dict_id: int = Form(...), json_file: Up
 
     vocab_service.import_favourites(user_id=user.id, items=items)
     return RedirectResponse(url=f"/vocab?dict_id={dict_id}", status_code=303)
+
+
+@router.post("/vocab/{fav_id}/mastery_inc")
+def mastery_inc(request: Request, fav_id: int, dict_id: int = Form(...), sort_by: str = Form("alpha"), order: str = Form("asc")):
+    user, redirect = _require_user(request)
+    if redirect:
+        return redirect
+    fav = vocab_service.get_favourite(fav_id=fav_id, user_id=user.id)
+    if fav:
+        new_level = min(5, int(fav.mastery) + 1)
+        vocab_service.update_mastery(fav_id=fav_id, user_id=user.id, mastery=new_level)
+    return RedirectResponse(url=f"/vocab?dict_id={dict_id}&fav_id={fav_id}&sort_by={sort_by}&order={order}", status_code=303)
+
+
+@router.post("/vocab/{fav_id}/mastery_dec")
+def mastery_dec(request: Request, fav_id: int, dict_id: int = Form(...), sort_by: str = Form("alpha"), order: str = Form("asc")):
+    user, redirect = _require_user(request)
+    if redirect:
+        return redirect
+    fav = vocab_service.get_favourite(fav_id=fav_id, user_id=user.id)
+    if fav:
+        new_level = max(1, int(fav.mastery) - 1)
+        vocab_service.update_mastery(fav_id=fav_id, user_id=user.id, mastery=new_level)
+    return RedirectResponse(url=f"/vocab?dict_id={dict_id}&fav_id={fav_id}&sort_by={sort_by}&order={order}", status_code=303)

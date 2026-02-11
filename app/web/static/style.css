@@ -61,3 +61,10 @@ code { background: #f3f3f3; padding: 2px 6px; border-radius: 8px; }
 .list-scroll { max-height: calc(100vh - 300px); overflow-y: auto; padding-right: 6px; }
 .clickable { cursor: pointer; }
 .clickable:hover { box-shadow: 0 1px 0 rgba(0,0,0,0.06); }
+
+.rhs-scroll{max-height:calc(100vh - 300px);overflow-y:auto;padding-right:6px;}
+
+.stars{display:flex;gap:4px;}
+.star{background:none;border:none;font-size:20px;cursor:pointer;line-height:1;color:#111;padding:0 2px;}
+.star.on{opacity:1;}
+.star{opacity:0.35;}

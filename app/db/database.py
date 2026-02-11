@@ -43,68 +43,13 @@ def _table_exists(conn: sqlite3.Connection, table: str) -> bool:
     ).fetchone()
     return bool(row)
 
-def _migrate_favourites_to_global(conn: sqlite3.Connection) -> None:
-    """Bug fix (1): vocabulary should be global.
-
-    Older versions had:
-      favourites(user_id, dict_id, headword, ...)
-    which makes the vocabulary book dictionary-specific.
-
-    New schema:
-      favourites(user_id, headword, ...)
-    so a user favourites a *word* once, then can view it in any dictionary.
-
-    SQLite can't drop columns/constraints easily, so we do:
-      rename old table -> create new -> copy -> drop old
-    """
-    if not _table_exists(conn, "favourites"):
-        return
-
-    # Old schema indicator: dict_id column exists
-    if not _table_has_column(conn, "favourites", "dict_id"):
-        return  # already migrated
-
-    conn.execute("ALTER TABLE favourites RENAME TO favourites_old;")
-
-    conn.execute(
-        """
-        CREATE TABLE favourites (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            headword TEXT NOT NULL,
-            notes TEXT NOT NULL DEFAULT '',
-            created_at TEXT NOT NULL,
-            UNIQUE(user_id, headword),
-            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
-        );
-        """
-    )
-
-    # Copy + de-duplicate:
-    # If the same user has the same headword in multiple dictionaries, we keep the
-    # most recently created row's notes.
-    rows = conn.execute(
-        """
-        SELECT user_id, headword, notes, created_at
-        FROM favourites_old
-        ORDER BY datetime(created_at) ASC
-        """
-    ).fetchall()
-
-    for r in rows:
-        conn.execute(
-            """
-            INSERT INTO favourites (user_id, headword, notes, created_at)
-            VALUES (?, ?, ?, ?)
-            ON CONFLICT(user_id, headword)
-            DO UPDATE SET notes=excluded.notes, created_at=excluded.created_at
-            """,
-            (r["user_id"], r["headword"], r["notes"], r["created_at"]),
-        )
-
-    conn.execute("DROP TABLE favourites_old;")
-
 def init_db() -> None:
+    """Create tables if they don't exist.
+
+    NOTE: You said you'll recreate the database when schema changes.
+    In practice, it's convenient to allow restarting the dev server with an existing DB file,
+    so we also do a small, best-effort patch for the favourites schema.
+    """
     settings.DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     settings.DICT_ROOT.mkdir(parents=True, exist_ok=True)
 
@@ -166,25 +111,6 @@ def init_db() -> None:
             """
         )
 
-        # ---- Favourites (vocabulary book) ----
-        # Create new schema if table doesn't exist; otherwise migrate older schema.
-        if not _table_exists(conn, "favourites"):
-            conn.execute(
-                """
-                CREATE TABLE favourites (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER NOT NULL,
-                    headword TEXT NOT NULL,
-                    notes TEXT NOT NULL DEFAULT '',
-                    created_at TEXT NOT NULL,
-                    UNIQUE(user_id, headword),
-                    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
-                );
-                """
-            )
-        else:
-            _migrate_favourites_to_global(conn)
-
         # ---- History ----
         conn.execute(
             """
@@ -199,3 +125,101 @@ def init_db() -> None:
             );
             """
         )
+
+        # ---- Favourites (Vocabulary) ----
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS favourites (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                headword TEXT NOT NULL,
+                notes TEXT NOT NULL DEFAULT '',
+                mastery INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL,
+                UNIQUE(user_id, headword),
+                FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+            """
+        )
+
+        # Best-effort: if an older favourites table exists, ensure required columns exist.
+        _maybe_migrate_favourites_schema(conn)
+
+
+def _maybe_migrate_favourites_schema(conn) -> None:
+    """Best-effort, backwards-compatible schema patching.
+
+    You said you'll recreate the DB when schema changes; however, dev servers are often restarted
+    with an existing app.db file. This function prevents startup crashes by ensuring required
+    columns exist (idempotent). It will *not* attempt to rewrite indexes/collations.
+    """
+    try:
+        rows = conn.execute("PRAGMA table_info(favourites);").fetchall()
+    except Exception:
+        return
+    cols = {r[1] for r in rows}  # (cid, name, type, notnull, dflt_value, pk)
+    if not rows:
+        return
+
+
+# If an older schema used NOCASE collation on headword or the UNIQUE index,
+# "I" and "i" would be treated as the same word. Rebuild the table to restore
+# case-sensitive behaviour.
+try:
+    row = conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='favourites';").fetchone()
+    table_sql = (row[0] if row else "") or ""
+except Exception:
+    table_sql = ""
+
+if "NOCASE" in table_sql.upper():
+    try:
+        conn.execute("ALTER TABLE favourites RENAME TO favourites_old;")
+        conn.execute(
+            """
+            CREATE TABLE favourites (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                headword TEXT NOT NULL,
+                notes TEXT NOT NULL DEFAULT '',
+                mastery INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL,
+                UNIQUE(user_id, headword),
+                FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+            """
+        )
+        # Copy best-effort (duplicates differing only by case couldn't exist in old schema anyway)
+        conn.execute(
+            """INSERT INTO favourites (id, user_id, headword, notes, mastery, created_at)
+                 SELECT id, user_id, headword, notes,
+                        COALESCE(mastery, 1) as mastery,
+                        created_at
+                 FROM favourites_old;"""
+        )
+        conn.execute("DROP TABLE favourites_old;")
+        # Refresh column set after rebuild
+        rows = conn.execute("PRAGMA table_info(favourites);").fetchall()
+        cols = {r[1] for r in rows}
+    except Exception:
+        # If rebuild fails, keep running with the existing table.
+        pass
+
+    # New in v7: mastery
+    if "mastery" not in cols:
+        try:
+            conn.execute("ALTER TABLE favourites ADD COLUMN mastery INTEGER NOT NULL DEFAULT 1;")
+        except Exception:
+            pass
+
+    # Ensure notes exists (older versions might have NULLable notes)
+    if "notes" not in cols:
+        try:
+            conn.execute("ALTER TABLE favourites ADD COLUMN notes TEXT NOT NULL DEFAULT '';")
+        except Exception:
+            pass
+
+    if "created_at" not in cols:
+        try:
+            conn.execute("ALTER TABLE favourites ADD COLUMN created_at TEXT NOT NULL DEFAULT '';")
+        except Exception:
+            pass
