@@ -1,14 +1,24 @@
 from __future__ import annotations
 
-from typing import Optional, Tuple
+"""Data access layer for users.
+
+This module talks directly to SQLite (via get_conn()) and returns model objects.
+Keep it very boring: no business rules here.
+"""
+
 from datetime import datetime, timezone
+from typing import Optional, Tuple
 
 from app.db.database import get_conn
 from app.models.user import User
 
+
 class UserRepo:
+    # ---------- create / read ----------
+
     def create_user(self, username: str, password_hash: str) -> User:
         now = datetime.now(timezone.utc).isoformat()
+
         with get_conn() as conn:
             cur = conn.execute(
                 """INSERT INTO users (username, password_hash, created_at, is_admin)
@@ -38,8 +48,10 @@ class UserRepo:
                      FROM users WHERE username = ?""",
                 (username,),
             ).fetchone()
+
         if not row:
             return None
+
         user = User(
             id=row["id"],
             username=row["username"],
@@ -57,8 +69,10 @@ class UserRepo:
                      FROM users WHERE id = ?""",
                 (user_id,),
             ).fetchone()
+
         if not row:
             return None
+
         return User(
             id=row["id"],
             username=row["username"],
@@ -68,30 +82,88 @@ class UserRepo:
             is_admin=row["is_admin"],
         )
 
+    # ---------- updates ----------
+
     def update_profile(self, user_id: int, display_name: str, bio: str) -> Optional[User]:
         with get_conn() as conn:
-            conn.execute("UPDATE users SET display_name = ?, bio = ? WHERE id = ?", (display_name, bio, user_id))
+            conn.execute(
+                "UPDATE users SET display_name = ?, bio = ? WHERE id = ?",
+                (display_name, bio, user_id),
+            )
             row = conn.execute(
-                """SELECT id, username, display_name, bio, created_at, is_admin FROM users WHERE id = ?""",
+                """SELECT id, username, display_name, bio, created_at, is_admin
+                     FROM users WHERE id = ?""",
                 (user_id,),
             ).fetchone()
+
         if not row:
             return None
+
         return User(
-            id=row["id"], username=row["username"], display_name=row["display_name"],
-            bio=row["bio"], created_at=row["created_at"], is_admin=row["is_admin"]
+            id=row["id"],
+            username=row["username"],
+            display_name=row["display_name"],
+            bio=row["bio"],
+            created_at=row["created_at"],
+            is_admin=row["is_admin"],
         )
 
     def update_username(self, user_id: int, new_username: str) -> Optional[User]:
         with get_conn() as conn:
-            conn.execute("UPDATE users SET username = ? WHERE id = ?", (new_username, user_id))
+            conn.execute(
+                "UPDATE users SET username = ? WHERE id = ?",
+                (new_username, user_id),
+            )
             row = conn.execute(
-                """SELECT id, username, display_name, bio, created_at, is_admin FROM users WHERE id = ?""",
+                """SELECT id, username, display_name, bio, created_at, is_admin
+                     FROM users WHERE id = ?""",
                 (user_id,),
             ).fetchone()
+
         if not row:
             return None
+
         return User(
-            id=row["id"], username=row["username"], display_name=row["display_name"],
-            bio=row["bio"], created_at=row["created_at"], is_admin=row["is_admin"]
+            id=row["id"],
+            username=row["username"],
+            display_name=row["display_name"],
+            bio=row["bio"],
+            created_at=row["created_at"],
+            is_admin=row["is_admin"],
         )
+
+    def update_password_hash(self, user_id: int, new_password_hash: str) -> None:
+        """Update password hash for a user."""
+        with get_conn() as conn:
+            conn.execute(
+                "UPDATE users SET password_hash = ? WHERE id = ?",
+                (new_password_hash, user_id),
+            )
+
+    # ---------- deletes ----------
+
+    def delete_user(self, user_id: int) -> None:
+        """Delete a user. Related rows are removed via ON DELETE CASCADE."""
+        with get_conn() as conn:
+            conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+
+    # ---------- admin views ----------
+
+    def list_users(self) -> list[User]:
+        """Admin: list all users."""
+        with get_conn() as conn:
+            rows = conn.execute(
+                "SELECT id, username, display_name, bio, created_at, is_admin FROM users ORDER BY id ASC"
+            ).fetchall()
+
+        return [
+            User(
+                id=r["id"],
+                username=r["username"],
+                display_name=r["display_name"],
+                bio=r["bio"],
+                created_at=r["created_at"],
+                is_admin=r["is_admin"],
+            )
+            for r in rows
+        ]

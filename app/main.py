@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app.db.database import init_db
-from app.web.routers import home, auth, profile, ideas, dictionary, vocab, history, admin_dicts, dict_assets
+from app.web.routers import home, auth, profile, ideas, dictionary, vocab, history, admin_dicts, admin_users, dict_assets
 
 app = FastAPI(title="Layered FastAPI Dictionary App")
 
@@ -23,4 +23,5 @@ app.include_router(vocab.router)
 app.include_router(history.router)
 
 app.include_router(admin_dicts.router)
+app.include_router(admin_users.router)
 app.include_router(dict_assets.router)

@@ -1,0 +1,47 @@
+
+{% extends "base.html" %}
+{% block content %}
+  <h1>Admin: User Management</h1>
+
+  <section class="card">
+    <p class="hint">
+      You can view and delete users here.
+      Deleting a user will also delete all related data (sessions, ideas, favourites, history) due to DB cascade.
+    </p>
+
+    {% if users|length == 0 %}
+      <p class="hint">No users found.</p>
+    {% else %}
+      <table class="table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Username</th>
+            <th>Role</th>
+            <th>Created</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in users %}
+            <tr>
+              <td>{{ u.id }}</td>
+              <td>
+                <strong>{{ u.username }}</strong>
+                {% if u.display_name %}<div class="hint small">{{ u.display_name }}</div>{% endif %}
+              </td>
+              <td>{% if u.is_admin %}Admin{% else %}Normal{% endif %}</td>
+              <td class="hint">{{ u.created_at }}</td>
+              <td>
+                <form method="post" action="/admin/users/{{ u.id }}/delete"
+                      onsubmit="return confirm('Delete user {{ u.username }} (id={{ u.id }})? This cannot be undone.');">
+                  <button class="danger" type="submit">Delete</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+  </section>
+{% endblock %}

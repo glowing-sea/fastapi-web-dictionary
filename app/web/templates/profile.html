@@ -22,6 +22,26 @@
         <label>New username <input name="new_username" required minlength="3" /></label>
         <button type="submit">Change username</button>
       </form>
+
+<hr/>
+<h3>Change password</h3>
+<form method="post" action="/me/password">
+  <label>New password
+    <input type="password" name="new_password" required minlength="6" />
+  </label>
+  <label>Confirm new password
+    <input type="password" name="new_password_confirm" required minlength="6" />
+  </label>
+  <button type="submit">Change password</button>
+  <p class="hint">For this demo, we don't ask for your old password.</p>
+</form>
+
+<hr/>
+<h3>Delete account</h3>
+<p class="hint">This will delete your account and all related data (ideas, favourites, history, sessions). This cannot be undone.</p>
+<form method="post" action="/me/delete" onsubmit="return confirm('Delete your account? This cannot be undone.');">
+  <button class="danger" type="submit">Delete my account</button>
+</form>
     </section>
   </div>
 {% endblock %}

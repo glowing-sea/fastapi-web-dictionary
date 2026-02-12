@@ -161,65 +161,65 @@ def _maybe_migrate_favourites_schema(conn) -> None:
     if not rows:
         return
 
+# Migration Helper
+# # If an older schema used NOCASE collation on headword or the UNIQUE index,
+# # "I" and "i" would be treated as the same word. Rebuild the table to restore
+# # case-sensitive behaviour.
+# try:
+#     row = conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='favourites';").fetchone()
+#     table_sql = (row[0] if row else "") or ""
+# except Exception:
+#     table_sql = ""
 
-# If an older schema used NOCASE collation on headword or the UNIQUE index,
-# "I" and "i" would be treated as the same word. Rebuild the table to restore
-# case-sensitive behaviour.
-try:
-    row = conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='favourites';").fetchone()
-    table_sql = (row[0] if row else "") or ""
-except Exception:
-    table_sql = ""
+# if "NOCASE" in table_sql.upper():
+#     try:
+#         conn.execute("ALTER TABLE favourites RENAME TO favourites_old;")
+#         conn.execute(
+#             """
+#             CREATE TABLE favourites (
+#                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+#                 user_id INTEGER NOT NULL,
+#                 headword TEXT NOT NULL,
+#                 notes TEXT NOT NULL DEFAULT '',
+#                 mastery INTEGER NOT NULL DEFAULT 1,
+#                 created_at TEXT NOT NULL,
+#                 UNIQUE(user_id, headword),
+#                 FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+#             );
+#             """
+#         )
+#         # Copy best-effort (duplicates differing only by case couldn't exist in old schema anyway)
+#         conn.execute(
+#             """INSERT INTO favourites (id, user_id, headword, notes, mastery, created_at)
+#                  SELECT id, user_id, headword, notes,
+#                         COALESCE(mastery, 1) as mastery,
+#                         created_at
+#                  FROM favourites_old;"""
+#         )
+#         conn.execute("DROP TABLE favourites_old;")
+#         # Refresh column set after rebuild
+#         rows = conn.execute("PRAGMA table_info(favourites);").fetchall()
+#         cols = {r[1] for r in rows}
+#     except Exception:
+#         # If rebuild fails, keep running with the existing table.
+#         pass
 
-if "NOCASE" in table_sql.upper():
-    try:
-        conn.execute("ALTER TABLE favourites RENAME TO favourites_old;")
-        conn.execute(
-            """
-            CREATE TABLE favourites (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                headword TEXT NOT NULL,
-                notes TEXT NOT NULL DEFAULT '',
-                mastery INTEGER NOT NULL DEFAULT 1,
-                created_at TEXT NOT NULL,
-                UNIQUE(user_id, headword),
-                FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
-            );
-            """
-        )
-        # Copy best-effort (duplicates differing only by case couldn't exist in old schema anyway)
-        conn.execute(
-            """INSERT INTO favourites (id, user_id, headword, notes, mastery, created_at)
-                 SELECT id, user_id, headword, notes,
-                        COALESCE(mastery, 1) as mastery,
-                        created_at
-                 FROM favourites_old;"""
-        )
-        conn.execute("DROP TABLE favourites_old;")
-        # Refresh column set after rebuild
-        rows = conn.execute("PRAGMA table_info(favourites);").fetchall()
-        cols = {r[1] for r in rows}
-    except Exception:
-        # If rebuild fails, keep running with the existing table.
-        pass
+#     # New in v7: mastery
+#     if "mastery" not in cols:
+#         try:
+#             conn.execute("ALTER TABLE favourites ADD COLUMN mastery INTEGER NOT NULL DEFAULT 1;")
+#         except Exception:
+#             pass
 
-    # New in v7: mastery
-    if "mastery" not in cols:
-        try:
-            conn.execute("ALTER TABLE favourites ADD COLUMN mastery INTEGER NOT NULL DEFAULT 1;")
-        except Exception:
-            pass
+#     # Ensure notes exists (older versions might have NULLable notes)
+#     if "notes" not in cols:
+#         try:
+#             conn.execute("ALTER TABLE favourites ADD COLUMN notes TEXT NOT NULL DEFAULT '';")
+#         except Exception:
+#             pass
 
-    # Ensure notes exists (older versions might have NULLable notes)
-    if "notes" not in cols:
-        try:
-            conn.execute("ALTER TABLE favourites ADD COLUMN notes TEXT NOT NULL DEFAULT '';")
-        except Exception:
-            pass
-
-    if "created_at" not in cols:
-        try:
-            conn.execute("ALTER TABLE favourites ADD COLUMN created_at TEXT NOT NULL DEFAULT '';")
-        except Exception:
-            pass
+#     if "created_at" not in cols:
+#         try:
+#             conn.execute("ALTER TABLE favourites ADD COLUMN created_at TEXT NOT NULL DEFAULT '';")
+#         except Exception:
+#             pass

@@ -20,6 +20,7 @@
           <a href="/me">Profile</a>
           {% if user.is_admin %}
             <a class="badge" href="/admin/dicts">Admin: Dictionaries</a>
+            <a class="badge" href="/admin/users">Admin: Users</a>
           {% endif %}
           <form class="inline" method="post" action="/logout">
             <button class="linklike" type="submit">Logout</button>
